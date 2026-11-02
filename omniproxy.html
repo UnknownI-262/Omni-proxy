@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OmniProxy</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --desk: #e9eaee;
+    --panel: #fafafb;
+    --panel-2: #f0f1f4;
+    --line: #d5d8df;
+    --ink: #1b1f2a;
+    --ink-2: #5b6272;
+    --accent: #2f5bea;
+    --accent-ink: #ffffff;
+    --danger: #c4372f;
+    --paper: #ffffff;
+    --slot: #f3f4f7;
+    --cut: #7a8090;
+    --shadow: 0 1px 2px rgba(20,24,40,.08), 0 8px 24px rgba(20,24,40,.10);
+  }
+  [data-theme="dark"] {
+    --desk: #101216;
+    --panel: #1a1d24;
+    --panel-2: #232731;
+    --line: #2f3440;
+    --ink: #e8eaf0;
+    --ink-2: #99a0b0;
+    --accent: #7c9cff;
+    --accent-ink: #0d1020;
+    --danger: #ff7a70;
+    --paper: #f7f7f5;
+    --slot: #e6e7ea;
+    --cut: #6f7585;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--desk);
+    color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .app { display: grid; grid-template-columns: 400px 1fr; height: 100%; }
+  .side {
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .side-scroll { overflow-y: auto; flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 22px; }
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--line);
+  }
+  .top h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  .btn {
+    border: 1px solid var(--line); background: var(--panel-2);
+    border-radius: 8px; padding: 7px 12px;
+  }
+  .btn:hover { border-color: var(--ink-2); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .55; cursor: progress; }
+
+  h2 { font-size: 13px; margin: 0 0 8px; font-weight: 650; }
+  .search input {
+    width: 100%; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel-2);
+  }
+  .search input::placeholder { color: var(--ink-2); }
+  .hint { color: var(--ink-2); font-size: 12.5px; margin: 6px 0 0; min-height: 18px; }
+
+  .results {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 8px; margin-top: 10px;
+  }
+  .result {
+    padding: 0; border: 1px solid transparent; background: none; border-radius: 4px; position: relative;
+  }
+  .result img { width: 100%; aspect-ratio: 59 / 86; object-fit: cover; border-radius: 3px; display: block; background: var(--slot); }
+  .result:hover { border-color: var(--accent); }
+  .result .plus {
+    position: absolute; right: 4px; bottom: 4px; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-ink); font-weight: 700; line-height: 20px; text-align: center;
+    opacity: 0; transition: opacity .12s;
+  }
+  .result:hover .plus, .result:focus-visible .plus { opacity: 1; }
+
+  .sheet-list { display: flex; flex-direction: column; gap: 4px; }
+  .row {
+    display: grid; grid-template-columns: 28px 1fr auto auto; gap: 10px; align-items: center;
+    padding: 4px 6px 4px 4px; border-radius: 8px;
+  }
+  .row:hover { background: var(--panel-2); }
+  .row img { width: 28px; aspect-ratio: 59 / 86; object-fit: cover; border-radius: 2px; background: var(--slot); }
+  .meta { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .meta .name { max-width: 100%; }
+  .art-btn {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 6px;
+    padding: 1px 8px; font-size: 12px; color: var(--ink-2);
+  }
+  .art-btn:hover { border-color: var(--accent); color: var(--ink); }
+  .result .alt {
+    position: absolute; left: 4px; top: 4px; padding: 0 6px; border-radius: 4px; font-size: 11px;
+    background: var(--accent); color: var(--accent-ink); font-weight: 600;
+  }
+  .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qty { display: flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; }
+  .qty button, .rm {
+    width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--panel); line-height: 1; padding: 0;
+  }
+  .qty span { min-width: 22px; text-align: center; }
+  .rm { color: var(--danger); }
+  .empty { color: var(--ink-2); padding: 6px 2px; }
+
+  .settings { display: grid; gap: 12px; }
+  .field { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; }
+  .field output { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .field input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  select {
+    border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 6px 10px;
+  }
+  .sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .sec-head h2 { margin: 0; }
+  .btn.small { padding: 3px 10px; font-size: 12.5px; }
+  .btn.confirm { border-color: var(--danger); color: var(--danger); }
+  details.import summary { cursor: pointer; font-weight: 650; font-size: 13px; }
+  details.import[open] summary { margin-bottom: 10px; }
+  details.import textarea {
+    width: 100%; padding: 10px 12px; border-radius: 8px; resize: vertical; min-height: 110px;
+    border: 1px solid var(--line); background: var(--panel-2); font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  }
+  .import-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 10px; }
+  .dims { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .dims[hidden] { display: none; }
+  .dims label { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
+  .dims input {
+    width: 76px; padding: 6px 8px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+  }
+  .check { display: flex; gap: 8px; align-items: center; }
+  .check input { accent-color: var(--accent); }
+
+  .foot { border-top: 1px solid var(--line); padding: 14px 16px; display: grid; gap: 8px; }
+  .foot .meta { color: var(--ink-2); font-size: 12.5px; }
+  .error { color: var(--danger); font-size: 12.5px; min-height: 18px; }
+
+  .preview { overflow: auto; padding: 28px; display: flex; flex-direction: column; align-items: center; gap: 28px; }
+  .page-wrap { width: min(100%, 640px); }
+  .page-label { color: var(--ink-2); font-size: 12.5px; margin: 0 0 6px 2px; }
+  .page {
+    position: relative; width: 100%; aspect-ratio: 210 / 297;
+    background: var(--paper); box-shadow: var(--shadow); border-radius: 2px; overflow: hidden;
+  }
+  .slot { position: absolute; background: var(--slot); }
+  .slot img { width: 100%; height: 100%; display: block; object-fit: fill; }
+  .bleed-img { position: absolute; display: block; }
+  .mark { position: absolute; background: #1a1a1a; }
+  .cut { position: absolute; }
+  .cut.v { border-left: 1px dashed var(--cut); }
+  .cut.h { border-top: 1px dashed var(--cut); }
+
+  @media (max-width: 860px) {
+    body { overflow: auto; }
+    html, body { height: auto; }
+    .app { grid-template-columns: 1fr; height: auto; }
+    .side { border-right: 0; border-bottom: 1px solid var(--line); }
+    .side-scroll { overflow: visible; }
+    .preview { padding: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="top">
+      <h1>OmniProxy</h1>
+      <button class="btn" id="themeBtn" type="button" aria-label="Toggle dark mode">Dark mode</button>
+    </div>
+
+    <div class="side-scroll">
+      <section class="search">
+        <div class="sec-head">
+          <h2>Find cards</h2>
+          <select id="game" aria-label="Card game"></select>
+        </div>
+        <input id="q" type="search" autocomplete="off" aria-label="Search cards">
+        <p class="hint" id="searchHint">Type at least 2 characters.</p>
+        <div class="results" id="results"></div>
+      </section>
+
+      <section>
+        <details class="import" id="importBox">
+          <summary>Import deck list</summary>
+          <textarea id="deckText" spellcheck="false" aria-label="Deck list"
+></textarea>
+          <div class="import-row">
+            <label class="check"><input id="incSide" type="checkbox"> Include side deck</label>
+            <label class="check"><input id="replaceSheet" type="checkbox"> Replace current sheet</label>
+          </div>
+          <div class="import-row">
+            <button class="btn primary" id="importBtn" type="button">Import</button>
+            <label class="btn" style="cursor:pointer">Open file<input id="deckFile" type="file" accept=".ydk,.txt,text/plain" hidden></label>
+            <button class="btn" id="clearTextBtn" type="button">Clear text</button>
+          </div>
+          <p class="hint" id="importHint" role="status"></p>
+        </details>
+      </section>
+
+      <section>
+        <div class="sec-head">
+          <h2>Sheet <span id="count" style="color:var(--ink-2);font-weight:400"></span></h2>
+          <button class="btn small" id="clearSheetBtn" type="button">Clear sheet</button>
+        </div>
+        <div class="sheet-list" id="sheetList"></div>
+      </section>
+
+      <section>
+        <h2>Layout</h2>
+        <div class="settings">
+          <div class="field">
+            <label for="paper">Paper</label>
+            <select id="paper"></select>
+          </div>
+          <div class="field">
+            <label for="orient">Orientation</label>
+            <select id="orient">
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </div>
+          <div class="dims" id="customPaper" hidden>
+            <label>Width <input id="paperW" type="number" inputmode="decimal" min="20" max="1000" step="0.1" value="210"> mm</label>
+            <label>Height <input id="paperH" type="number" inputmode="decimal" min="20" max="1000" step="0.1" value="297"> mm</label>
+          </div>
+          <div class="field">
+            <label for="cardSize">Card size</label>
+            <select id="cardSize"></select>
+          </div>
+          <div class="dims" id="customCard" hidden>
+            <label>Width <input id="cardW" type="number" inputmode="decimal" min="20" max="300" step="0.1" value="59"> mm</label>
+            <label>Height <input id="cardH" type="number" inputmode="decimal" min="20" max="300" step="0.1" value="86"> mm</label>
+          </div>
+          <div class="field">
+            <label for="margin">Page margin</label><output id="marginOut"></output>
+            <input id="margin" type="range" min="0" max="20" step="1" value="10">
+          </div>
+          <div class="field">
+            <label for="gap">Gap between cards</label><output id="gapOut"></output>
+            <input id="gap" type="range" min="0" max="6" step="0.5" value="0">
+          </div>
+          <div class="field">
+            <label for="bleed">Bleed</label><output id="bleedOut"></output>
+            <input id="bleed" type="range" min="0" max="3" step="0.5" value="0">
+          </div>
+          <label class="check"><input id="cutLines" type="checkbox" checked> Dotted cut lines</label>
+          <label class="check"><input id="cropMarks" type="checkbox"> Crop marks (outside the grid)</label>
+        </div>
+      </section>
+    </div>
+
+    <div class="foot">
+      <div class="meta" id="summary"></div>
+      <div class="error" id="err" role="alert"></div>
+      <button class="btn primary" id="exportBtn" type="button">Download PDF</button>
+    </div>
+  </aside>
+
+  <main class="preview" id="preview" aria-label="A4 sheet preview"></main>
+</div>
+
+<script>
+/* ============================================================
+ * 1. CONFIG
+ * ============================================================ */
+const CONFIG = {
+  api: 'https://db.ygoprodeck.com/api/v7/cardinfo.php',
+  searchLimit: 24,
+  cardSizes: {                   // mm
+    ygo: { label: 'Yu-Gi-Oh! (59 × 86)',            w: 59, h: 86 },
+    std: { label: 'Magic / Pokémon (63 × 88)',      w: 63, h: 88 }
+  },
+  papers: {                      // mm, portrait; margin = sensible default for that size
+    a4:     { label: 'A4',            w: 210,   h: 297,   margin: 10 },
+    letter: { label: 'Letter (short bond)', w: 215.9, h: 279.4, margin: 10 },
+    long:   { label: 'Long bond (8.5×13)', w: 215.9, h: 330.2, margin: 10 },
+    '5r':   { label: '5R (5×7 in)',   w: 127,   h: 178,   margin: 3 },
+    '4r':   { label: '4R (4×6 in)',   w: 102,   h: 152,   margin: 3 }
+  },
+  cutOvershoot: 3,               // mm that cut lines extend past the grid
+  // If the browser blocks image fetches (CORS), set a proxy, e.g. 'https://corsproxy.io/?'
+  // The image URL is appended URL-encoded. Better: host your own proxy/cache.
+  imageProxy: '',
+  pokemonApiKey: '',             // optional free key from dev.pokemontcg.io (raises the rate limit)
+  // Tried in order when the direct image fetch is blocked (YGOPRODeck images send no CORS headers).
+  // Swap in your own proxy/cache for anything beyond personal use.
+  fallbackProxies: [
+    u => `https://images.weserv.nl/?url=${encodeURIComponent(u)}&output=jpg&q=95`,
+    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`
+  ]
+};
+
+/* ============================================================
+ * 2. STATE
+ * ============================================================ */
+const state = {
+  game: 'ygo',
+  sheets: {},                                  // per-game sheets, swapped in and out on game change
+  sheet: [],                                   // [{ id, name, thumb, img, qty }]
+  settings: {
+    paper: 'a4', orientation: 'portrait', customW: 210, customH: 297,
+    cardSize: 'ygo', cardW: 59, cardH: 86,
+    margin: 10, gap: 0, cutLines: true, bleed: 0, cropMarks: false
+  }
+};
+
+/* ============================================================
+ * 3. DATA: game adapters (Yu-Gi-Oh!, Magic, Pokémon)
+ *
+ * An adapter provides:
+ *   search(query)  -> entries for the result grid
+ *   lookup(name)   -> one entry for deck-list import (or null)
+ * An entry is { id, name, thumb, img, tag?, title?, arts, artIndex }:
+ *   `arts` lists every version of the card in the same result set, so the sheet can switch between them.
+ * ============================================================ */
+
+/* Shared JSON fetch. Returns null for 400/404 (no match). Retries through CONFIG.imageProxy if blocked. */
+async function getJson(url, headers) {
+  let res;
+  try {
+    res = await fetch(url, headers ? { headers } : undefined);
+  } catch (e) {
+    if (!CONFIG.imageProxy) throw e;           // blocked by CORS/CSP/offline; retry via proxy if set
+    res = await fetch(CONFIG.imageProxy + encodeURIComponent(url));
+  }
+  if (res.status === 400 || res.status === 404) return null;
+  if (res.status === 429) throw new Error('Rate limited. Wait a minute and retry.');
+  if (!res.ok) throw new Error(`Card request failed (${res.status})`);
+  return res.json();
+}
+
+/* items: [{ key, id, name, thumb, img, tag?, title? }]. Items with the same key become versions of one card. */
+function groupArts(items) {
+  const groups = new Map();
+  items.forEach(it => {
+    if (!groups.has(it.key)) groups.set(it.key, []);
+    groups.get(it.key).push({ id: it.id, thumb: it.thumb, img: it.img, tag: it.tag, title: it.title });
+  });
+  return items.map(it => {
+    const arts = groups.get(it.key);
+    const artIndex = arts.findIndex(a => a.id === it.id);
+    return { ...arts[artIndex], name: it.name, arts, artIndex };
+  });
+}
+function solo(t) {                             // a single-version entry (used by import)
+  const art = { id: t.id, thumb: t.thumb, img: t.img, tag: t.tag, title: t.title };
+  return { ...art, name: t.name, arts: [art], artIndex: 0 };
+}
+
+/* ---------- Yu-Gi-Oh! (YGOPRODeck) ---------- */
+async function ygoFetch(params) {
+  const json = await getJson(`${CONFIG.api}?${params}`);
+  return !json || json.error ? [] : (json.data || []);
+}
+/* card_images holds the default art plus any alternates; each art has its own id. */
+function ygoEntries(c) {
+  return groupArts(c.card_images.map((a, i) => ({
+    key: c.id, id: a.id, name: c.name, thumb: a.image_url_small, img: a.image_url,
+    tag: i > 0 ? `Alt ${i + 1}` : ''
+  })));
+}
+async function ygoSearch(query) {
+  const data = await ygoFetch(`fname=${encodeURIComponent(query)}&num=${CONFIG.searchLimit}&offset=0`);
+  return data.flatMap(ygoEntries);
+}
+async function ygoLookup(name) {
+  let data = await ygoFetch(`name=${encodeURIComponent(name)}`);
+  if (!data.length) {                          // fall back to fuzzy, but only trust a clear match
+    const fuzzy = await ygoFetch(`fname=${encodeURIComponent(name)}&num=5&offset=0`);
+    const exact = fuzzy.find(c => c.name.toLowerCase() === name.toLowerCase());
+    data = exact ? [exact] : (fuzzy.length === 1 ? fuzzy : []);
+  }
+  return data.length ? ygoEntries(data[0])[0] : null;
+}
+async function ygoByIds(ids) {                 // .ydk passcodes -> Map(passcode -> entry)
+  const byId = new Map();
+  (await ygoFetch(`id=${ids.join(',')}`)).forEach(c => ygoEntries(c).forEach(e => byId.set(e.id, e)));
+  return byId;
+}
+
+/* ---------- Magic: The Gathering (Scryfall) ---------- */
+const SCRY = 'https://api.scryfall.com';
+const mtgSetNum = /\s*\(([A-Za-z0-9]{2,6})\)\s*([A-Za-z0-9★-]+)\s*$/;   // Arena/MTGO export: "Lightning Bolt (M11) 149"
+function mtgTiles(c) {                         // one tile per face image (double-faced cards give two)
+  const tag = `${(c.set || '').toUpperCase()} ${c.collector_number}`;
+  const title = `${c.name} (${c.set_name} #${c.collector_number})`;
+  if (c.image_uris) return [{ id: c.id, name: c.name, thumb: c.image_uris.small, img: c.image_uris.large, tag, title }];
+  return (c.card_faces || []).filter(f => f.image_uris).map((f, i) => ({
+    id: `${c.id}-${i}`, name: c.name, thumb: f.image_uris.small, img: f.image_uris.large,
+    tag: i ? `${tag} back` : tag, title: i ? `${title}, back face` : title
+  }));
+}
+async function mtgSearch(query) {
+  const json = await getJson(`${SCRY}/cards/search?q=${encodeURIComponent(query)}&unique=art&order=name`);
+  const cards = ((json && json.data) || []).slice(0, CONFIG.searchLimit);
+  return groupArts(cards.flatMap(c => mtgTiles(c).map(t => ({ ...t, key: c.oracle_id || c.name }))));
+}
+async function mtgLookup(name) {
+  const m = name.match(mtgSetNum);
+  const base = name.replace(mtgSetNum, '').trim();
+  let card = null;
+  if (m) card = await getJson(`${SCRY}/cards/${m[1].toLowerCase()}/${encodeURIComponent(m[2])}`);
+  if (!card || card.object === 'error') card = await getJson(`${SCRY}/cards/named?fuzzy=${encodeURIComponent(base)}`);
+  if (!card || card.object === 'error') return null;
+  const t = mtgTiles(card)[0];
+  return t ? solo(t) : null;
+}
+
+/* ---------- Pokémon (pokemontcg.io) ---------- */
+const PTCG = 'https://api.pokemontcg.io/v2/cards';
+const ptcgSuffix = /\s+([A-Z0-9]{2,6})\s+(\d+[A-Za-z]*)\s*$/;   // Pokémon TCG Live export: "Pikachu SVI 63"
+function ptcgTile(c) {
+  return {
+    key: c.name, id: c.id, name: c.name, thumb: c.images.small, img: c.images.large,
+    tag: `${c.set.id} ${c.number}`, title: `${c.name} (${c.set.name} ${c.number}/${c.set.printedTotal})`
+  };
+}
+async function ptcgGet(params) {
+  const headers = CONFIG.pokemonApiKey ? { 'X-Api-Key': CONFIG.pokemonApiKey } : undefined;
+  const json = await getJson(`${PTCG}?${params}`, headers);
+  return (json && json.data) || [];
+}
+async function ptcgSearch(query) {
+  const terms = query.trim().split(/\s+/).map(t => t.replace(/[^\p{L}\p{N}.\-]/gu, '')).filter(Boolean);
+  if (!terms.length) return [];
+  const q = terms.map(t => `name:${t}*`).join(' ');
+  const data = await ptcgGet(`q=${encodeURIComponent(q)}&pageSize=${CONFIG.searchLimit}&orderBy=-set.releaseDate`);
+  return groupArts(data.map(ptcgTile));
+}
+async function ptcgLookup(name) {
+  const m = name.match(ptcgSuffix);
+  const base = name.replace(ptcgSuffix, '').trim();
+  let data = [];
+  if (m) data = await ptcgGet(`q=${encodeURIComponent(`set.ptcgoCode:${m[1]} number:${m[2]}`)}&pageSize=1`);
+  if (!data.length) {
+    data = await ptcgGet(`q=${encodeURIComponent(`name:"${base.replace(/"/g, '')}"`)}&pageSize=1&orderBy=-set.releaseDate`);
+  }
+  return data.length ? solo(ptcgTile(data[0])) : null;
+}
+
+const GAMES = {
+  ygo: {
+    label: 'Yu-Gi-Oh!', cardSize: 'ygo', concurrency: 4,
+    search: ygoSearch, lookup: ygoLookup, byIds: ygoByIds,
+    searchPlaceholder: 'Search Yu-Gi-Oh! cards, e.g. Dark Magician',
+    listPlaceholder: 'Paste a .ydk file or a text list, e.g.\n3x Dark Magician\nBlue-Eyes White Dragon x2\nPot of Greed'
+  },
+  mtg: {
+    label: 'Magic: The Gathering', cardSize: 'std', concurrency: 4,
+    search: mtgSearch, lookup: mtgLookup,
+    searchPlaceholder: 'Search Magic cards, e.g. Lightning Bolt',
+    listPlaceholder: 'Paste a deck list, e.g.\n4 Lightning Bolt\n2x Counterspell (MH2) 267\nIsland x10'
+  },
+  pokemon: {
+    label: 'Pokémon', cardSize: 'std', concurrency: 2,
+    search: ptcgSearch, lookup: ptcgLookup,
+    searchPlaceholder: 'Search Pokémon cards, e.g. Pikachu',
+    listPlaceholder: 'Paste a deck list, e.g.\n4 Pikachu SVI 63\n2x Professor\'s Research\nBasic Lightning Energy x8'
+  }
+};
+
+function searchCards(query) { return GAMES[state.game].search(query); }
+
+/* ---------- Deck list import (.ydk or plain text) ---------- */
+
+/* Accepts .ydk (#main / #extra / !side, one passcode per line) or text lines such as
+   "3x Dark Magician", "3 Dark Magician", "Dark Magician x3", "Dark Magician". */
+function parseDeckList(text, includeSide) {
+  const ids = new Map();                       // passcode -> qty (Yu-Gi-Oh! only)
+  const names = [];                            // { qty, name, full }
+  let section = 'main';
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const low = line.toLowerCase();
+    if (/^[#!]\s*side/.test(low) || /^side(board| deck)?:?$/.test(low)) { section = 'side'; continue; }
+    if (/^#\s*(main|extra)/.test(low) || /^(main|extra|deck|commander|companion)( deck)?:?$/.test(low)) { section = 'main'; continue; }
+    if (line.startsWith('#') || line.startsWith('//')) continue;       // comments, "#created by ..."
+    if (/^(pok[eé]mon|trainers?|energy)\s*:?\s*\d*$/i.test(line) || /^total cards/i.test(line)) continue;  // PTCGL headers
+    if (section === 'side' && !includeSide) continue;
+    if (/^\d{3,10}$/.test(line)) { ids.set(+line, (ids.get(+line) || 0) + 1); continue; }
+    let m;
+    if ((m = line.match(/^(\d{1,2})\s*[x×]?\s+(.+)$/i))) names.push({ qty: +m[1], name: m[2].trim(), full: line });
+    else if ((m = line.match(/^(.+?)\s+[x×]\s*(\d{1,2})$/i))) names.push({ qty: +m[2], name: m[1].trim(), full: line });
+    else names.push({ qty: 1, name: line, full: line });
+  }
+  return { ids, names };
+}
+
+const nameCache = new Map();
+async function lookupName(name) {
+  const key = `${state.game}:${name.toLowerCase()}`;
+  if (nameCache.has(key)) return nameCache.get(key);
+  const entry = await GAMES[state.game].lookup(name);
+  nameCache.set(key, entry);
+  return entry;
+}
+
+async function mapPool(items, n, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (next < items.length) { const k = next++; out[k] = await fn(items[k], k); }
+  }));
+  return out;
+}
+
+/* Returns { found: [{ card, qty }], missing: [label] } */
+async function resolveDeck({ ids, names }, onProgress = () => {}) {
+  const G = GAMES[state.game];
+  const found = [], missing = [];
+
+  const all = [...ids.keys()];
+  if (all.length && !G.byIds) {
+    all.forEach(id => missing.push(String(id)));   // passcodes only make sense for Yu-Gi-Oh!
+  } else {
+    for (let i = 0; i < all.length; i += 40) {
+      onProgress(`Looking up passcodes ${Math.min(i + 40, all.length)}/${all.length}`);
+      const chunk = all.slice(i, i + 40);
+      const byId = await G.byIds(chunk);
+      chunk.forEach(id => {
+        const card = byId.get(id);
+        if (card) found.push({ card, qty: ids.get(id) });
+        else missing.push(String(id));
+      });
+    }
+  }
+
+  let done = 0;
+  const resolved = await mapPool(names, G.concurrency, async (n) => {
+    onProgress(`Looking up names ${++done}/${names.length}`);
+    let card = await lookupName(n.name);
+    // "7 Colored Fish" parses as 7x "Colored Fish"; retry the full line as a name
+    if (!card && n.full !== n.name) {
+      card = await lookupName(n.full);
+      if (card) return { card, qty: 1 };
+    }
+    return { card, qty: n.qty, label: n.full };
+  });
+  resolved.forEach(r => r.card ? found.push({ card: r.card, qty: r.qty }) : missing.push(r.label));
+  return { found, missing };
+}
+
+/* Fetch an image as a data URL so jsPDF can embed it. Cached per URL. */
+const imageCache = new Map();
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Could not read image'));
+    r.readAsDataURL(blob);
+  });
+}
+async function loadImageData(url) {
+  if (imageCache.has(url)) return imageCache.get(url);
+  const attempt = async (u) => {
+    const res = await fetch(u, { mode: 'cors' });
+    if (!res.ok) throw new Error(`Image request failed (${res.status})`);
+    return blobToDataURL(await res.blob());
+  };
+  const routes = [
+    url,
+    ...(CONFIG.imageProxy ? [CONFIG.imageProxy + encodeURIComponent(url)] : []),
+    ...CONFIG.fallbackProxies.map(f => f(url))
+  ];
+  let lastErr;
+  for (const r of routes) {
+    try {
+      const data = await attempt(r);
+      imageCache.set(url, data);
+      return data;
+    } catch (e) { lastErr = e; }
+  }
+  throw new Error(`Could not load card image (${lastErr ? lastErr.message : 'unknown error'})`);
+}
+
+/* ============================================================
+ * 4. LAYOUT: pure functions, shared by preview and PDF
+ * ============================================================ */
+function getPage({ paper, orientation, customW, customH }) {
+  const { w, h } = paper === 'custom' ? { w: customW, h: customH } : CONFIG.papers[paper];
+  return orientation === 'landscape' ? { w: h, h: w } : { w, h };
+}
+
+function computeLayout({ paper, orientation, customW, customH, cardW, cardH, margin, gap, bleed, cropMarks }) {
+  const w = cardW, h = cardH;
+  const P = getPage({ paper, orientation, customW, customH });
+  const EPS = 1e-6;                            // guards against float error, e.g. 172 / 86
+  const cols = Math.max(0, Math.floor((P.w - 2 * margin + gap) / (w + gap) + EPS));
+  const rows = Math.max(0, Math.floor((P.h - 2 * margin + gap) / (h + gap) + EPS));
+  const gridW = cols * w + Math.max(0, cols - 1) * gap;
+  const gridH = rows * h + Math.max(0, rows - 1) * gap;
+  const x0 = (P.w - gridW) / 2;               // grid is centered on the page
+  const y0 = (P.h - gridH) / 2;
+
+  const slots = [];
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      slots.push({ x: x0 + c * (w + gap), y: y0 + r * (h + gap) });
+
+  // Cut lines: outer card edges, plus the middle of each gap between cards.
+  const edge = (i, n, start, size) =>
+    i === 0 ? start :
+    i === n ? start + n * size + (n - 1) * gap :
+    start + i * (size + gap) - gap / 2;
+  const vLines = Array.from({ length: cols + 1 }, (_, i) => edge(i, cols, x0, w));
+  const hLines = Array.from({ length: rows + 1 }, (_, i) => edge(i, rows, y0, h));
+
+  // Crop marks: short solid ticks outside the grid at the end of every cut line,
+  // so nothing is printed on the cards themselves.
+  const markOff = bleed + 1, markMax = 3;
+  const lenX = Math.min(markMax, x0 - markOff), lenY = Math.min(markMax, y0 - markOff);
+  const marks = [];
+  if (cropMarks && cols && rows) {
+    if (lenY > 0.3) vLines.forEach(x => {
+      marks.push({ x1: x, y1: y0 - markOff - lenY, x2: x, y2: y0 - markOff });
+      marks.push({ x1: x, y1: y0 + gridH + markOff, x2: x, y2: y0 + gridH + markOff + lenY });
+    });
+    if (lenX > 0.3) hLines.forEach(y => {
+      marks.push({ x1: x0 - markOff - lenX, y1: y, x2: x0 - markOff, y2: y });
+      marks.push({ x1: x0 + gridW + markOff, y1: y, x2: x0 + gridW + markOff + lenX, y2: y });
+    });
+  }
+  const marksClipped = cropMarks && (x0 < markOff + markMax || y0 < markOff + markMax);
+  const os = cropMarks ? 0 : CONFIG.cutOvershoot;   // dotted lines stop at the grid when marks are on
+
+  return { page: P, card: { w, h }, bleed, marks, marksClipped, markNeed: Math.ceil(markOff + markMax), os, cols, rows, perPage: cols * rows, slots, vLines, hLines, x0, y0, gridW, gridH };
+}
+
+/* Expand quantities into a flat list, then split into pages. */
+function expandSheet(sheet) {
+  return sheet.flatMap(c => Array.from({ length: c.qty }, () => c));
+}
+function paginate(cards, perPage) {
+  if (perPage < 1) return [];
+  const pages = [];
+  for (let i = 0; i < cards.length; i += perPage) pages.push(cards.slice(i, i + perPage));
+  return pages.length ? pages : [[]];          // always show at least one blank sheet
+}
+
+/* ============================================================
+ * 5. PDF EXPORT
+ * ============================================================ */
+async function exportPDF(onProgress = () => {}) {
+  const L = computeLayout(state.settings);
+  const cards = expandSheet(state.sheet);
+  if (!cards.length) throw new Error('Add at least one card first.');
+  if (L.perPage < 1) throw new Error('No card fits at these paper, card and margin settings.');
+
+  // Load each unique image once.
+  const unique = [...new Map(cards.map(c => [c.id, c])).values()];
+  const data = new Map();
+  for (let i = 0; i < unique.length; i++) {
+    onProgress(`Loading images ${i + 1}/${unique.length}`);
+    data.set(unique[i].id, await loadImageData(unique[i].img));
+  }
+
+  const { jsPDF } = window.jspdf;
+  const P = L.page;
+  const orient = P.w > P.h ? 'landscape' : 'portrait';
+  const doc = new jsPDF({ unit: 'mm', format: [P.w, P.h], orientation: orient });
+  const { w, h } = L.card;
+  const os = L.os, b = L.bleed;
+  const pages = paginate(cards, L.perPage);
+
+  pages.forEach((pageCards, p) => {
+    onProgress(`Building page ${p + 1}/${pages.length}`);
+    if (p > 0) doc.addPage([P.w, P.h], orient);
+
+    const place = (card, i, grow) => {
+      const { x, y } = L.slots[i];
+      const d = data.get(card.id);
+      const fmt = d.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+      // alias lets jsPDF embed a duplicate card once and reuse it
+      doc.addImage(d, fmt, x - grow, y - grow, w + 2 * grow, h + 2 * grow, `card-${card.id}`, 'FAST');
+    };
+    // Bleed: an enlarged copy of each card goes underneath, then every exact-size card on top
+    if (b > 0) pageCards.forEach((card, i) => place(card, i, b));
+    pageCards.forEach((card, i) => place(card, i, 0));
+
+    if (state.settings.cutLines) {
+      doc.setDrawColor(110);
+      doc.setLineWidth(0.1);
+      doc.setLineDashPattern([0.8, 0.8], 0);
+      L.vLines.forEach(x => doc.line(x, L.y0 - os, x, L.y0 + L.gridH + os));
+      L.hLines.forEach(y => doc.line(L.x0 - os, y, L.x0 + L.gridW + os, y));
+      doc.setLineDashPattern([], 0);
+    }
+
+    if (state.settings.cropMarks) {
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.15);
+      L.marks.forEach(m => doc.line(m.x1, m.y1, m.x2, m.y2));
+    }
+  });
+
+  doc.save(`omniproxy-${state.game}-${state.settings.paper}.pdf`);
+}
+
+/* ============================================================
+ * 6. UI
+ * ============================================================ */
+const $ = (id) => document.getElementById(id);
+const pct = (v, total) => `${(v / total * 100).toFixed(4)}%`;
+
+function addCard(card) {
+  const hit = state.sheet.find(c => c.id === card.id);
+  if (hit) hit.qty = Math.min(99, hit.qty + 1);
+  else state.sheet.push({ ...card, qty: 1 });
+  renderSheet(); renderPreview();
+}
+function setQty(id, delta) {
+  const c = state.sheet.find(c => c.id === id);
+  if (!c) return;
+  c.qty += delta;
+  if (c.qty < 1) state.sheet = state.sheet.filter(x => x.id !== id);
+  c.qty = Math.min(99, c.qty);
+  renderSheet(); renderPreview();
+}
+function cycleArt(id) {
+  const c = state.sheet.find(x => x.id === id);
+  if (!c || !c.arts || c.arts.length < 2) return;
+  const ni = (c.artIndex + 1) % c.arts.length;
+  const next = c.arts[ni];
+  const dupe = state.sheet.find(x => x !== c && x.id === next.id);
+  if (dupe) {                                   // that art is already on the sheet: merge counts
+    dupe.qty = Math.min(99, dupe.qty + c.qty);
+    state.sheet = state.sheet.filter(x => x !== c);
+  } else {
+    Object.assign(c, next, { artIndex: ni });
+  }
+  renderSheet(); renderPreview();
+}
+function removeCard(id) {
+  state.sheet = state.sheet.filter(c => c.id !== id);
+  renderSheet(); renderPreview();
+}
+
+function renderSheet() {
+  const list = $('sheetList');
+  list.textContent = '';
+  if (!state.sheet.length) {
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = 'No cards yet. Search above and click a card to add it.';
+    list.appendChild(p);
+  }
+  state.sheet.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `
+      <img alt="" loading="lazy">
+      <div class="meta">
+        <span class="name"></span>
+        <button type="button" class="art-btn" data-a="art" hidden></button>
+      </div>
+      <span class="qty">
+        <button type="button" data-a="dec" aria-label="Remove one copy">−</button>
+        <span></span>
+        <button type="button" data-a="inc" aria-label="Add one copy">+</button>
+      </span>
+      <button type="button" class="rm" data-a="rm" aria-label="Remove card">×</button>`;
+    row.querySelector('img').src = c.thumb;
+    row.querySelector('.name').textContent = c.name;
+    row.querySelector('.name').title = c.name;
+    row.querySelector('.qty span').textContent = c.qty;
+    const artBtn = row.querySelector('.art-btn');
+    if (c.arts && c.arts.length > 1) {
+      artBtn.hidden = false;
+      artBtn.textContent = `Art ${c.artIndex + 1} of ${c.arts.length}`;
+      artBtn.setAttribute('aria-label', `Switch artwork for ${c.name}`);
+    }
+    row.addEventListener('click', (e) => {
+      const a = e.target.closest('button')?.dataset.a;
+      if (a === 'inc') setQty(c.id, 1);
+      if (a === 'dec') setQty(c.id, -1);
+      if (a === 'rm') removeCard(c.id);
+      if (a === 'art') cycleArt(c.id);
+    });
+    list.appendChild(row);
+  });
+
+  $('clearSheetBtn').disabled = !state.sheet.length;
+  const total = expandSheet(state.sheet).length;
+  $('count').textContent = total ? `(${total} cards)` : '';
+}
+
+function renderPreview() {
+  const L = computeLayout(state.settings);
+  const P = L.page, { w, h } = L.card, os = L.os, b = L.bleed;
+  const cards = expandSheet(state.sheet);
+  const pages = paginate(cards, L.perPage);
+  const root = $('preview');
+  root.textContent = '';
+
+  const summary = L.perPage
+    ? `${L.cols} × ${L.rows} per page, ${L.perPage} cards. ${pages.length} page${pages.length === 1 ? '' : 's'}.`
+    : 'No card fits at these paper, card and margin settings.';
+  let note = '';
+  if (L.perPage && state.settings.cropMarks && L.marksClipped)
+    note = ` Crop marks need about ${L.markNeed} mm of free space around the grid, so they are shortened here.`;
+  $('summary').textContent = summary + note;
+
+  pages.forEach((pageCards, p) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'page-wrap';
+    const label = document.createElement('p');
+    label.className = 'page-label';
+    label.textContent = `Page ${p + 1} of ${pages.length}`;
+    const page = document.createElement('div');
+    page.className = 'page';
+    page.style.aspectRatio = `${P.w} / ${P.h}`;
+
+    if (b > 0) pageCards.forEach((card, i) => {   // bleed sits underneath every card
+      const s = L.slots[i];
+      const img = document.createElement('img');
+      img.className = 'bleed-img'; img.alt = ''; img.src = card.img;
+      Object.assign(img.style, {
+        left: pct(s.x - b, P.w), top: pct(s.y - b, P.h), width: pct(w + 2 * b, P.w), height: pct(h + 2 * b, P.h)
+      });
+      page.appendChild(img);
+    });
+
+    L.slots.forEach((s, i) => {
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      Object.assign(slot.style, {
+        left: pct(s.x, P.w), top: pct(s.y, P.h), width: pct(w, P.w), height: pct(h, P.h)
+      });
+      const card = pageCards[i];
+      if (card) {
+        const img = document.createElement('img');
+        img.src = card.img; img.alt = card.name; img.loading = 'lazy';
+        slot.appendChild(img);
+      }
+      page.appendChild(slot);
+    });
+
+    if (state.settings.cutLines && L.perPage) {
+      L.vLines.forEach(x => {
+        const d = document.createElement('div');
+        d.className = 'cut v';
+        Object.assign(d.style, { left: pct(x, P.w), top: pct(L.y0 - os, P.h), height: pct(L.gridH + 2 * os, P.h) });
+        page.appendChild(d);
+      });
+      L.hLines.forEach(y => {
+        const d = document.createElement('div');
+        d.className = 'cut h';
+        Object.assign(d.style, { top: pct(y, P.h), left: pct(L.x0 - os, P.w), width: pct(L.gridW + 2 * os, P.w) });
+        page.appendChild(d);
+      });
+    }
+
+    L.marks.forEach(m => {
+      const d = document.createElement('div');
+      d.className = 'mark';
+      Object.assign(d.style, {
+        left: pct(m.x1, P.w), top: pct(m.y1, P.h),
+        width: m.x1 === m.x2 ? '1px' : pct(m.x2 - m.x1, P.w),
+        height: m.y1 === m.y2 ? '1px' : pct(m.y2 - m.y1, P.h)
+      });
+      page.appendChild(d);
+    });
+
+    wrap.append(label, page);
+    root.appendChild(wrap);
+  });
+}
+
+/* ---- search ---- */
+let searchTimer, searchSeq = 0;
+function runSearch() {
+  const q = $('q').value.trim();
+  const hint = $('searchHint'), box = $('results');
+  clearTimeout(searchTimer);
+  const seq = ++searchSeq;                     // ignore stale responses (no AbortSignal: sandboxed previews can't clone it)
+  if (q.length < 2) { box.textContent = ''; hint.textContent = 'Type at least 2 characters.'; return; }
+  hint.textContent = 'Searching…';
+  searchTimer = setTimeout(async () => {
+    try {
+      const cards = await searchCards(q);
+      if (seq !== searchSeq) return;
+      box.textContent = '';
+      hint.textContent = cards.length ? `${cards.length} result${cards.length === 1 ? '' : 's'}. Tags mark other versions. Click one to add it.` : `No cards match “${q}”.`;
+      cards.forEach(c => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'result'; b.title = c.title || c.name;
+        b.setAttribute('aria-label', `Add ${c.name}`);
+        b.innerHTML = '<img alt="" loading="lazy"><span class="plus">+</span>';
+        b.querySelector('img').src = c.thumb;
+        if (c.tag) {
+          b.setAttribute('aria-label', `Add ${c.title || c.name}`);
+          const tag = document.createElement('span');
+          tag.className = 'alt'; tag.textContent = c.tag;
+          b.appendChild(tag);
+        }
+        b.addEventListener('click', () => addCard(c));
+        box.appendChild(b);
+      });
+    } catch (e) {
+      if (seq === searchSeq) {
+        console.error(e);
+        hint.textContent = `Search failed: ${e.message}. If this page is inside a preview or sandbox, open the file directly in Chrome or Firefox. Otherwise set CONFIG.imageProxy.`;
+      }
+    }
+  }, 300);
+}
+$('q').addEventListener('input', runSearch);
+
+/* ---- settings ---- */
+function syncSettings() {
+  const S = state.settings;
+  const num = (id, min, max, prev) => {        // ignore half-typed or invalid values
+    const v = parseFloat($(id).value);
+    return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : prev;
+  };
+  S.paper = $('paper').value;
+  S.orientation = $('orient').value;
+  S.customW = num('paperW', 20, 1000, S.customW);
+  S.customH = num('paperH', 20, 1000, S.customH);
+  $('customPaper').hidden = S.paper !== 'custom';
+  S.cardSize = $('cardSize').value;
+  if (S.cardSize === 'custom') {
+    S.cardW = num('cardW', 20, 300, S.cardW);
+    S.cardH = num('cardH', 20, 300, S.cardH);
+  } else {
+    S.cardW = CONFIG.cardSizes[S.cardSize].w;
+    S.cardH = CONFIG.cardSizes[S.cardSize].h;
+  }
+  $('customCard').hidden = S.cardSize !== 'custom';
+  state.settings.margin = +$('margin').value;
+  state.settings.gap = +$('gap').value;
+  state.settings.cutLines = $('cutLines').checked;
+  $('marginOut').textContent = `${state.settings.margin} mm`;
+  $('gapOut').textContent = `${state.settings.gap} mm`;
+  state.settings.bleed = +$('bleed').value;
+  state.settings.cropMarks = $('cropMarks').checked;
+  $('bleedOut').textContent = `${state.settings.bleed} mm`;
+  renderPreview();
+}
+['orient', 'paperW', 'paperH', 'cardW', 'cardH', 'margin', 'gap', 'bleed', 'cutLines', 'cropMarks'].forEach(id => $(id).addEventListener('input', syncSettings));
+
+Object.entries(CONFIG.papers).forEach(([key, p]) => {
+  const o = document.createElement('option');
+  o.value = key; o.textContent = p.label;
+  $('paper').appendChild(o);
+});
+const customPaperOpt = document.createElement('option');
+customPaperOpt.value = 'custom'; customPaperOpt.textContent = 'Custom size…';
+$('paper').appendChild(customPaperOpt);
+
+Object.entries(CONFIG.cardSizes).forEach(([key, c]) => {
+  const o = document.createElement('option');
+  o.value = key; o.textContent = c.label;
+  $('cardSize').appendChild(o);
+});
+const customCardOpt = document.createElement('option');
+customCardOpt.value = 'custom'; customCardOpt.textContent = 'Custom size…';
+$('cardSize').appendChild(customCardOpt);
+
+$('paper').addEventListener('change', () => {
+  const prev = state.settings.paper, next = $('paper').value;
+  if (next === 'custom') {
+    if (prev !== 'custom') {                   // start from the size you were just using
+      const base = CONFIG.papers[prev];
+      $('paperW').value = base.w; $('paperH').value = base.h;
+    }
+  } else {
+    $('margin').value = CONFIG.papers[next].margin;   // small photo sizes need a tighter margin
+  }
+  syncSettings();
+});
+$('cardSize').addEventListener('change', () => {
+  if ($('cardSize').value === 'custom') {
+    $('cardW').value = state.settings.cardW; $('cardH').value = state.settings.cardH;
+  }
+  syncSettings();
+});
+
+/* ---- theme ---- */
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  $('themeBtn').textContent = t === 'dark' ? 'Light mode' : 'Dark mode';
+}
+$('themeBtn').addEventListener('click', () =>
+  setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+setTheme(matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+/* ---- export ---- */
+$('exportBtn').addEventListener('click', async () => {
+  const btn = $('exportBtn'), err = $('err');
+  err.textContent = '';
+  btn.disabled = true;
+  const label = btn.textContent;
+  try {
+    await exportPDF(msg => { btn.textContent = msg; });
+  } catch (e) {
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+});
+
+/* ---- deck import ---- */
+async function runImport() {
+  const btn = $('importBtn'), hint = $('importHint');
+  const text = $('deckText').value;
+  const parsed = parseDeckList(text, $('incSide').checked);
+  if (!parsed.ids.size && !parsed.names.length) { hint.textContent = 'Nothing to import. Paste a deck list first.'; return; }
+  btn.disabled = true;
+  try {
+    const { found, missing } = await resolveDeck(parsed, msg => { hint.textContent = msg + '…'; });
+    if ($('replaceSheet').checked) state.sheet = [];
+    let total = 0;
+    found.forEach(({ card, qty }) => {
+      total += qty;
+      const hit = state.sheet.find(c => c.id === card.id);
+      if (hit) hit.qty = Math.min(99, hit.qty + qty);
+      else state.sheet.push({ ...card, qty: Math.min(99, qty) });
+    });
+    renderSheet(); renderPreview();
+    let msg = `Imported ${total} card${total === 1 ? '' : 's'} (${found.length} unique).`;
+    if (missing.length) {
+      const shown = missing.slice(0, 5).join(', ') + (missing.length > 5 ? `, +${missing.length - 5} more` : '');
+      msg += ` Not found: ${shown}.`;
+    }
+    hint.textContent = msg;
+  } catch (e) {
+    console.error(e);
+    hint.textContent = `Import failed: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+$('importBtn').addEventListener('click', runImport);
+$('deckFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  $('deckText').value = await file.text();
+  e.target.value = '';
+  runImport();
+});
+$('clearTextBtn').addEventListener('click', () => {
+  $('deckText').value = '';
+  $('importHint').textContent = '';
+  $('deckText').focus();
+});
+
+/* Clear sheet: two taps to confirm (confirm() dialogs are blocked in some previews) */
+let clearTimer;
+const clearBtn = $('clearSheetBtn');
+function resetClearBtn() {
+  clearTimeout(clearTimer);
+  clearBtn.textContent = 'Clear sheet';
+  clearBtn.classList.remove('confirm');
+}
+clearBtn.addEventListener('click', () => {
+  if (!clearBtn.classList.contains('confirm')) {
+    clearBtn.textContent = 'Tap again to clear';
+    clearBtn.classList.add('confirm');
+    clearTimer = setTimeout(resetClearBtn, 3000);
+    return;
+  }
+  resetClearBtn();
+  state.sheet = [];
+  renderSheet(); renderPreview();
+});
+
+/* ---- game switching ---- */
+function applyGameUI() {
+  const G = GAMES[state.game];
+  $('q').placeholder = G.searchPlaceholder;
+  $('deckText').placeholder = G.listPlaceholder;
+}
+Object.entries(GAMES).forEach(([key, g]) => {
+  const o = document.createElement('option');
+  o.value = key; o.textContent = g.label;
+  $('game').appendChild(o);
+});
+$('game').addEventListener('change', () => {
+  const next = $('game').value;
+  state.sheets[state.game] = state.sheet;      // keep each game's sheet separate
+  state.game = next;
+  state.sheet = state.sheets[next] || [];
+  $('cardSize').value = GAMES[next].cardSize;  // each game starts at its usual card size
+  $('q').value = '';
+  $('results').textContent = '';
+  $('searchHint').textContent = 'Type at least 2 characters.';
+  $('importHint').textContent = '';
+  if (searchTimer) clearTimeout(searchTimer);
+  searchSeq++;                                 // drop any in-flight search from the old game
+  applyGameUI();
+  renderSheet();
+  syncSettings();
+});
+
+/* ---- init ---- */
+applyGameUI();
+renderSheet();
+syncSettings();
+</script>
+</body>
+</html>
