@@ -5,8 +5,8 @@ OmniProxy: print-ready proxy sheets for Yu-Gi-Oh!, Magic, and Pokémon. Search, 
 
 A single-file web app that turns a deck list into a print-ready PDF with dotted cut lines. Supports **Yu-Gi-Oh!, Magic: The Gathering, and Pokémon**. Search a card, add it to the sheet, and download. No install, no build step, no backend.
 
-<!-- Add a screenshot here: ![OmniProxy](screenshot.png) -->
-
+# Live Demo
+- [This is the live demo](https://unknowni-262.github.io/Omni-proxy/)
 ## Features
 
 - **Deck import**: paste a text list (`3x Dark Magician`, `Dark Magician x3`), a `.ydk` file (Yu-Gi-Oh!), or a Magic Arena or Pokémon TCG Live export (`4 Lightning Bolt (M11) 149`, `4 Pikachu SVI 63`), or open a file. Optional side deck, and cards are merged into your sheet
